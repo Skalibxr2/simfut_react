@@ -53,14 +53,117 @@ function logoFor(team) {
 
 // Speed presets (ms per simulated minute)
 const SPEED_PRESETS = {
-  "4x": 150,
-  "2x": 300,
-  "1x": 600,
-  "0.5x": 1200,
+  "4x": 50,
+  "2x": 100,
+  "1x": 200,
+  "0.5x": 400,
 };
 
+// Snapshot de la config usada para esta simulación
+//const [configSnap, setConfigSnap] = useState(null);
+// { homeName, awayName, duration, extraTime, penalties }
+
+
 // Durations available (regulation time)
-const DURATIONS = [60, 90];
+const DURATIONS = [30, 60, 90];
+
+// --- Clasificador de eventos (lado, tipo, icono) ---
+
+function normalize(str = "") {
+  return str
+    .toLowerCase()
+    .normalize("NFD").replace(/\p{Diacritic}/gu, "")
+    .replace(/ñ/g, "n");
+}
+
+const K = {
+  goal: ["gol", "anota", "marca"],
+  yellow: ["amarilla"],
+  red: ["roja", "expulsion", "expulsado"],
+  injury: ["lesion", "lesionado", "sale por lesion"],
+  start: ["inicio", "comienza", "arranca"],
+  break: ["entretiempo", "descanso", "fin del primer tiempo", "termina el primer tiempo"],
+  secondStart: ["inicio del segundo tiempo", "arranca el segundo tiempo"],
+  end: ["final", "termina el partido", "fin del partido"],
+  pen: ["penal"], // notarás que ya generas líneas de penales con equipo en el texto
+};
+
+function detectType(t) {
+  const text = normalize(t);
+  const hit = (arr) => arr.some(w => text.includes(w));
+  if (hit(K.goal)) return "goal";
+  if (hit(K.red)) return "red";
+  if (hit(K.yellow)) return "yellow";
+  if (hit(K.injury)) return "injury";
+  if (hit(K.secondStart)) return "secondStart";
+  if (hit(K.break)) return "break";
+  if (hit(K.start)) return "start";
+  if (hit(K.end)) return "end";
+  if (hit(K.pen)) return "pen";
+  return "other";
+}
+
+// iconos simples; cámbialos por SVG si prefieres
+function iconFor(type) {
+  switch (type) {
+    case "goal": return "⚽";
+    case "yellow": return "🟨";
+    case "red": return "🟥";
+    case "injury": return "🏥";
+    case "pen": return "🧤";
+    case "start": return "🟢";
+    case "break": return "⏸️";
+    case "secondStart": return "▶️";
+    case "end": return "🏁";
+    default: return "•";
+  }
+}
+
+/*function resetMatchView(nextDuration = form.duration) {
+  setRunning(false);
+  setFinished(false);
+  setResult(null);
+  setLiveEvents([]);
+  setClock(0);
+  setTotalMinutes(nextDuration);
+  nextEventIndexRef.current = 0;
+  setConfigSnap(null);
+}*/
+
+/*function onTeamChange(side, value) {
+  if (running) return;            // 1) ignorar cambios si está corriendo
+  resetMatchView();               // 2) limpiar si estaba terminado/pausado
+  setForm(prev => ({ ...prev, [side]: value }));
+}*/
+
+
+/**
+ * Determina a quién pertenece: 'home' | 'away' | 'neutral'
+ * Reglas:
+ *  - Si el texto trae el nombre del equipo (normalizado) → lado correspondiente
+ *  - Palabras guía: 'local', 'visita/visitante'
+ *  - Eventos estructurales (inicio/descanso/fin) → neutral
+ */
+function detectSide(text, homeName, awayName) {
+  const t = normalize(text);
+  const h = normalize(homeName);
+  const a = normalize(awayName);
+
+  const type = detectType(t);
+  if (["start", "break", "secondStart", "end"].includes(type)) return { side: "neutral", type };
+
+  // nombre explícito
+  if (h && t.includes(h)) return { side: "home", type };
+  if (a && t.includes(a)) return { side: "away", type };
+
+  // guías genéricas
+  if (t.includes("local")) return { side: "home", type };
+  if (t.includes("visita") || t.includes("visitante")) return { side: "away", type };
+
+  // si dice "gol" sin equipo, preferimos neutral para no confundir
+  return { side: "neutral", type };
+}
+
 
 // Determine period label (1T, 2T, ET1, ET2, FT)
 function periodLabel(minNow, duration, hasET) {
@@ -135,6 +238,7 @@ function Field({ label, error, children }) {
 function Select({ value, onChange, options, placeholder }) {
   return (
     <select
+
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className="border rounded-xl px-3 py-2 focus:outline-none focus:ring w-full"
@@ -147,12 +251,16 @@ function Select({ value, onChange, options, placeholder }) {
   );
 }
 
-function ClimateSelect({ value, onChange }) {
+function ClimateSelect({ value, onChange, disabled }) {
   return (
     <select
+
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      
       className="border rounded-xl px-3 py-2 focus:outline-none focus:ring w-full"
+      disabled={disabled}
+
     >
       {CLIMAS.map((c) => (
         <option key={c.id} value={c.id}>{c.label}</option>
@@ -176,7 +284,132 @@ function TeamBadge({ name }) {
   );
 }
 
+
+
+// Alto fijo para alinear filas aunque un lado esté vacío
+const ROW_HEIGHT = 50; // px, ajusta si quieres más compacto
+
+function EventTimeline({ events, homeName, awayName, autoScroll = true }) {
+  // Convertimos a filas en el orden exacto recibido
+  const rows = useMemo(() => {
+    return events.map((ev) => {
+      const { side, type } = detectSide(ev.text, homeName, awayName);
+      return { ...ev, side, type };
+    });
+  }, [events, homeName, awayName]);
+
+  // contenedor con scroll y autoscroll al llegar nuevos eventos
+  const wrapRef = useRef(null);
+  useEffect(() => {
+    if (!autoScroll || !wrapRef.current) return;
+    wrapRef.current.scrollTop = wrapRef.current.scrollHeight;
+  }, [rows.length, autoScroll]);
+
+  return (
+    <div
+      ref={wrapRef}
+      className="max-h-80 overflow-auto pr-2"
+      style={{ scrollBehavior: "smooth" }}
+    >
+      {/* Header opcional de columnas */}
+      <div className="grid grid-cols-5 text-xs text-gray-500 mb-2">
+        <div className="col-span-2">{homeName || "Local"}</div>
+        <div className="col-span-1 flex justify-center">—</div>
+        <div className="col-span-2 text-right">{awayName || "Visitante"}</div>
+      </div>
+
+      {/* Filas */}
+      <div className="grid grid-cols-5 gap-y-2">
+        {rows.map((row, i) => {
+          if (row.side === "neutral") {
+            return (
+              <div key={`n-${i}`} className="col-span-5">
+                <EventNeutral minute={row.minute} text={row.text} type={row.type} />
+              </div>
+            );
+          }
+
+          // Fila “simétrica”: home | línea | away
+          return (
+            <div key={`r-${i}`} className="contents">
+              {/* Home (2 cols) */}
+              <div className="col-span-2">
+                {row.side === "home" ? (
+                  <EventBubble
+                    minute={row.minute}
+                    text={row.text}
+                    type={row.type}
+                    align="left"
+                  />
+                ) : (
+                  // placeholder para que la fila mantenga altura
+                  <div style={{ height: ROW_HEIGHT }} />
+                )}
+              </div>
+
+              {/* Línea central */}
+              <div className="col-span-1 flex justify-center">
+                <div className="w-0.5 bg-gray-200" style={{ height: ROW_HEIGHT }} />
+              </div>
+
+              {/* Away (2 cols) */}
+              <div className="col-span-2">
+                {row.side === "away" ? (
+                  <EventBubble
+                    minute={row.minute}
+                    text={row.text}
+                    type={row.type}
+                    align="right"
+                  />
+                ) : (
+                  <div style={{ height: ROW_HEIGHT }} />
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function EventBubble({ minute, text, type, align }) {
+  const base =
+    "rounded-2xl px-3 py-2 text-sm shadow border bg-white max-w-[95%]";
+  const sideCls = align === "right" ? "ml-auto text-right" : "mr-auto text-left";
+  return (
+    <div className={`${base} ${sideCls}`} style={{ minHeight: ROW_HEIGHT - 12 }}>
+      <div className="flex items-center gap-2">
+        <span className="shrink-0">{iconFor(type)}</span>
+        <p className="break-words">{text}</p>
+      </div>
+      <div className="text-xs text-gray-500 mt-1 tabular-nums">{minute}'</div>
+    </div>
+  );
+}
+
+function EventNeutral({ minute, text, type }) {
+  return (
+    <div
+      className="mx-auto bg-gray-50 border text-gray-700 rounded-xl px-3 py-1 text-sm w-fit"
+      style={{ minHeight: ROW_HEIGHT - 16 }}
+    >
+      <span className="mr-2">{iconFor(type)}</span>
+      <span>{text}</span>
+      <span className="ml-2 text-xs text-gray-500 tabular-nums">{minute}'</span>
+    </div>
+  );
+}
+
+
+
+
+
 export default function Simulador() {
+
+  // snapshot de la config usada al iniciar el partido
+  const [configSnap, setConfigSnap] = useState(null);
+
   const [form, setForm] = useState({
     home: "",
     away: "",
@@ -235,6 +468,11 @@ export default function Simulador() {
     return CLIMAS.find((c) => c.id === form.climate)?.label ?? "Normal";
   }, [form.climate]);
 
+
+  // Nombres a mostrar (si hay snapshot, usamos los del inicio del partido)
+const homeName = configSnap?.homeName || form.home;
+const awayName = configSnap?.awayName || form.away;
+
   function validate() {
     const e = {};
     if (!form.home) e.home = "Debe seleccionar un equipo local.";
@@ -255,8 +493,37 @@ export default function Simulador() {
     localStorage.setItem("sim-resultados", JSON.stringify([nuevo, ...prev].slice(0, 200)));
   }
 
+  // limpiar vista para una nueva simulación
+  function resetMatchView(nextDuration = form.duration) {
+    setRunning(false);
+    setFinished(false);
+    setResult(null);
+    setLiveEvents([]);
+    setClock(0);
+    setTotalMinutes(nextDuration);
+    nextEventIndexRef.current = 0;
+    setConfigSnap(null);
+  }
+
+  // cambios de equipo solo cuando NO está corriendo
+  function onTeamChange(side, value) {
+    if (running) return;    // ignorar si corre
+    resetMatchView();       // limpiar si estaba finalizado/pausado
+    setForm(prev => ({ ...prev, [side]: value }));
+  }
+
   function startMatch() {
     if (!validate()) return;
+
+    // Congelar config en snapshot
+    setConfigSnap({
+      homeName: form.home,
+      awayName: form.away,
+      duration: form.duration,
+      extraTime: form.extraTime,
+      penalties: form.penalties,
+    });
+
     const base = { ...form };
     const T = form.duration;
     const sim1 = simulatePhase(base, T, 0);
@@ -348,57 +615,128 @@ export default function Simulador() {
     return () => clearInterval(timerRef.current);
   }, [running, result, totalMinutes, speedKey]);
 
+  /*const snap = {
+    homeName: form.home,
+    awayName: form.away,
+    duration: form.duration,
+    extraTime: form.extraTime,
+    penalties: form.penalties,
+  };*/
+
+  //setConfigSnap(snap);
+
+
   return (
     <div className="grid md:grid-cols-3 gap-4">
       <div className="md:col-span-1 p-4 rounded-2xl bg-white shadow">
         <h2 className="font-semibold mb-4 text-lg">Configuración del partido</h2>
         <div className="flex flex-col gap-3">
-          <Field label="Equipo local" error={errors.home}>
-            <Select value={form.home} onChange={(v) => setForm({ ...form, home: v })} options={TEAMS} placeholder="— Selecciona un equipo —" />
+          {/* Equipo local */}
+          <Field label="Equipo local">
+            <select
+              value={form.home}
+              onChange={(e) => onTeamChange("home", e.target.value)}
+              disabled={running}
+              className="border rounded-xl px-3 py-2 focus:outline-none focus:ring w-full"
+            >
+              <option value="">— Selecciona —</option>
+              {TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
           </Field>
-          <Field label="Equipo visitante" error={errors.away}>
-            <Select value={form.away} onChange={(v) => setForm({ ...form, away: v })} options={TEAMS} placeholder="— Selecciona un equipo —" />
+
+          {/* Equipo visitante */}
+          <Field label="Equipo visitante">
+            <select
+              value={form.away}
+              onChange={(e) => onTeamChange("away", e.target.value)}
+              disabled={running}
+              className="border rounded-xl px-3 py-2 focus:outline-none focus:ring w-full"
+            >
+              <option value="">— Selecciona —</option>
+              {TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
           </Field>
+
+          {/* Duración */}
           <Field label="Duración">
             <select
               value={form.duration}
-              onChange={(e) => setForm({ ...form, duration: Number(e.target.value) })}
+              onChange={(e) => {
+                if (running) return;                    // no permitir si corre
+                const next = Number(e.target.value);
+                resetMatchView(next);                   // limpiar vista y reloj
+                setForm(prev => ({ ...prev, duration: next }));
+              }}
+              disabled={running}
               className="border rounded-xl px-3 py-2 focus:outline-none focus:ring w-full"
             >
-              {DURATIONS.map((d) => <option key={d} value={d}>{d} minutos</option>)}
+              <option value={60}>60 minutos</option>
+              <option value={90}>90 minutos</option>
             </select>
           </Field>
-          <div className="flex items-center gap-3">
+
+          {/* Alargue / Penales */}
+          <div className="flex items-center gap-6">
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
                 checked={form.extraTime}
-                onChange={(e) => setForm({ ...form, extraTime: e.target.checked })}
+                onChange={(e) => {
+                  if (running) return;
+                  const v = e.target.checked;
+                  // si se desactiva alargue, apagar penales
+                  setForm(prev => ({ ...prev, extraTime: v, penalties: v ? prev.penalties : false }));
+                  resetMatchView(); // limpiar si estaba finalizado
+                }}
+                disabled={running}
               />
               Alargue (si empatan)
             </label>
+
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
                 checked={form.penalties}
-                onChange={(e) => setForm({ ...form, penalties: e.target.checked })}
-                disabled={!form.extraTime}
+                onChange={(e) => {
+                  if (running) return;
+                  setForm(prev => ({ ...prev, penalties: e.target.checked }));
+                  resetMatchView();
+                }}
+                disabled={!form.extraTime || running}   // sólo si hay alargue y no corre
               />
               Penales si persiste el empate
             </label>
           </div>
+
+          {/* Clima */}
           <Field label="Clima">
-            <ClimateSelect value={form.climate} onChange={(v) => setForm({ ...form, climate: v })} />
+            <ClimateSelect
+              value={form.climate}
+              onChange={(v) => {
+                if (running) return;
+                setForm({ ...form, climate: v });
+                // si quieres limpiar al cambiar clima (opcional):
+                // resetMatchView();
+              }}
+              disabled={running}
+            />
           </Field>
+
+          {/* Velocidad */}
           <Field label="Velocidad">
             <select
+              disabled={running}
               value={speedKey}
               onChange={(e) => setSpeedKey(e.target.value)}
               className="border rounded-xl px-3 py-2 focus:outline-none focus:ring w-full"
             >
-              {Object.keys(SPEED_PRESETS).map((k) => <option key={k} value={k}>{k}</option>)}
+              {Object.keys(SPEED_PRESETS).map((k) => (
+                <option key={k} value={k}>{k}</option>
+              ))}
             </select>
           </Field>
+
+          {/* Stats solo lectura */}
           {(form.home || form.away) && (
             <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
               <div className="border rounded-xl p-2">
@@ -413,6 +751,7 @@ export default function Simulador() {
               </div>
             </div>
           )}
+
           <div className="flex gap-2 mt-4 flex-wrap">
             {!result || finished ? (
               <button onClick={startMatch} className="px-4 py-2 rounded-2xl bg-black text-white">Simular (en vivo)</button>
@@ -442,23 +781,23 @@ export default function Simulador() {
         <h2 className="font-semibold mb-4 text-lg">Resultado</h2>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
-            <TeamBadge name={form.home} />
+            <TeamBadge name={homeName} />
             <div className="text-center">
               <p className="text-sm uppercase tracking-wide text-gray-500">
-                {(form.home || "Local").toUpperCase()} vs {(form.away || "Visita").toUpperCase()}
+                {(homeName || "Local").toUpperCase()} vs {(awayName || "Visita").toUpperCase()}
               </p>
               {(() => {
                 let h = 0, a = 0;
                 for (const ev of liveEvents) {
                   const t = (ev.text || "").toLowerCase();
                   if (!t.includes("gol")) continue;
-                  if (t.includes((form.home || "").toLowerCase()) || t.includes("local")) h++;
-                  else if (t.includes((form.away || "").toLowerCase()) || t.includes("visita") || t.includes("visitante")) a++;
+                  if (t.includes((homeName || "").toLowerCase()) || t.includes("local")) h++;
+                  else if (t.includes((awayName || "").toLowerCase()) || t.includes("visita") || t.includes("visitante")) a++;
                 }
                 return <p className="text-2xl font-bold">{result ? `${h} - ${a}` : "— : —"}</p>;
               })()}
             </div>
-            <TeamBadge name={form.away} />
+            <TeamBadge name={awayName} />
           </div>
           <div className="text-right">
             <div className="font-mono text-xl tabular-nums">
@@ -475,7 +814,7 @@ export default function Simulador() {
         </div>
         {!result ? (
           <p className="text-sm text-gray-600">
-            Configura el partido y presiona <strong>Simular (en vivo)</strong>.
+            Configura el partido y presiona <strong>Simular</strong>.
           </p>
         ) : (
           <div className="flex flex-col gap-4">
@@ -484,15 +823,13 @@ export default function Simulador() {
               {liveEvents.length === 0 ? (
                 <p className="text-sm text-gray-600">Esperando eventos…</p>
               ) : (
-                <ol className="space-y-1 text-sm">
-                  {liveEvents.map((ev, i) => (
-                    <li key={i} className="flex items-center gap-2">
-                      <span className="inline-block w-12 text-right tabular-nums">{ev.minute}'</span>
-                      <span>{ev.text}</span>
-                    </li>
-                  ))}
-                </ol>
+                <EventTimeline
+                  events={liveEvents}
+                  homeName={homeName}
+                  awayName={awayName}
+                />
               )}
+
               {finished && <p className="mt-3 text-sm text-gray-500">Partido finalizado.</p>}
             </div>
           </div>
