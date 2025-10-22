@@ -54,6 +54,53 @@ function logoFor(team) {
   return hit?.[1] ?? genericShield;
 }
 
+// --- Eventos fijos del partido (neutrales, centrados) ---
+function addFixedMilestones({ events, duration, extraTime, penalties, finalMinutes }) {
+  const mid = Math.floor(duration / 2);
+  const out = events.slice();
+
+  // Tiempo reglamentario
+  const fixed = [
+    { minute: 0, text: "Inicio del partido" },
+    { minute: mid, text: "Fin del primer tiempo" },
+    { minute: mid, text: "Entretiempo" },
+    { minute: mid, text: "Inicio del segundo tiempo" },
+  ];
+
+  // Si hay alargue (ET)
+  if (extraTime && finalMinutes > duration) {
+    fixed.push(
+      { minute: duration, text: "Fin del tiempo reglamentario" },
+      { minute: duration, text: "Inicio del alargue (ET1)" },
+      { minute: duration + 15, text: "Fin del ET1" },
+      { minute: duration + 15, text: "Inicio del ET2" },
+    );
+  }
+
+  // Si hay penales (solo cuando termina empatado)
+  if (penalties && finalMinutes >= duration) {
+    // Lo colocamos al minuto final; si no hubo ET, finalMinutes === duration
+    fixed.push({ minute: finalMinutes, text: "Comienzan los penales" });
+  }
+
+  // Fin del partido (siempre)
+  fixed.push({ minute: finalMinutes, text: "Fin del partido" });
+
+  // Evitar duplicados exactos (mismo texto y minuto)
+  const seen = new Set();
+  for (const e of out) seen.add(`${e.minute}__${e.text}`);
+
+  for (const f of fixed) {
+    const key = `${f.minute}__${f.text}`;
+    if (!seen.has(key)) out.push(f);
+  }
+
+  out.sort((a, b) => a.minute - b.minute);
+  return out;
+}
+
+
+
 // Speed presets (ms per simulated minute)
 const SPEED_PRESETS = {
   "4x": 50,
@@ -438,6 +485,11 @@ function ClimateSelect({ value, onChange, disabled }) {
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
+<<<<<<< Updated upstream
+=======
+
+      className="border rounded-xl px-3 py-2 focus:outline-none focus:ring w-full"
+>>>>>>> Stashed changes
       disabled={disabled}
       className="border rounded-xl px-3 py-2 focus:outline-none focus:ring w-full"
     >
@@ -658,8 +710,13 @@ export default function Simulador() {
 
 
   // Nombres a mostrar (si hay snapshot, usamos los del inicio del partido)
+<<<<<<< Updated upstream
   //const homeName = configSnap?.homeName || form.home;
   //const awayName = configSnap?.awayName || form.away;
+=======
+  const homeName = configSnap?.homeName || form.home;
+  const awayName = configSnap?.awayName || form.away;
+>>>>>>> Stashed changes
 
   function validate() {
     const e = {};
@@ -738,6 +795,7 @@ export default function Simulador() {
       eventsAll = eventsAll.concat(pens.events);
     }
 
+<<<<<<< Updated upstream
     // add disciplinary events (cards)
     eventsAll = addDisciplinaryEvents({
       events: eventsAll,
@@ -749,6 +807,27 @@ export default function Simulador() {
       etMultiplier: 0.4,
       intensity: 1,
     });
+=======
+    eventsAll = addFixedMilestones({
+    events: eventsAll,
+    duration: T,
+    extraTime: form.extraTime,
+    penalties: form.penalties,
+    finalMinutes,
+  });
+
+  // tarjetas
+  eventsAll = addDisciplinaryEvents({
+    events: eventsAll,
+    homeName: form.home,
+    awayName: form.away,
+    totalMinutes: finalMinutes,
+    basePer90: 4.8,
+    redRatio: 0.14,
+    etMultiplier: 0.4,
+    intensity: 1,
+  });
+>>>>>>> Stashed changes
 
     const payload = {
       events: eventsAll,
