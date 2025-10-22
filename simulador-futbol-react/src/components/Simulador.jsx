@@ -4,13 +4,13 @@ import genericShield from "../assets/teams/_generic.png";
 
 // Attack and defense ratings for teams
 const TEAM_STATS = {
-  "Colo-Colo": { attack: 2.2, defense: 1.1 },
+  "Colo-Colo": { attack: 2.2, defense: 1.2 },
   "Universidad de Chile": { attack: 1.1, defense: 1.05 },
   "Universidad Católica": { attack: 1.15, defense: 1.1 },
   "Cobresal": { attack: 1.0, defense: 1.0 },
   "Huachipato": { attack: 1.0, defense: 1.05 },
-  "Coquimbo Unido": { attack: 0.95, defense: 1.0 },
-  "Unión Española": { attack: 1.05, defense: 0.95 },
+  "Coquimbo Unido": { attack: 1.0, defense: 1.0 },
+  "Unión Española": { attack: 0.95, defense: 0.95 },
   "Audax Italiano": { attack: 1.0, defense: 1.0 },
   "O'Higgins": { attack: 0.9, defense: 0.95 },
   "Palestino": { attack: 0.95, defense: 0.9 }
@@ -26,40 +26,108 @@ const TEAMS = [
   "Unión Española",
   "Audax Italiano",
   "O'Higgins",
-  "Palestino",
+  "Palestino"
 ];
 
 // Import all team logos from assets
 const teamLogoMap = import.meta.glob("../assets/teams/*.png", { eager: true, as: "url" });
 
-// slugify function to map team names to file names
+// Slugify function to map team names to file names
 function slugify(name) {
   return name
     .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .replace(/ñ/g, "n")
+    .normalize("NFD").replace(/\p{Diacritic}/gu, "")
+    .replace(/\u00f1/g, "n")
     .replace(/['’]/g, "")
     .replace(/&/g, "y")
     .replace(/\s+/g, "-")
     .replace(/[^a-z0-9-]/g, "");
 }
 
-// Return logo url for a team; fallback to generic shield
 function logoFor(team) {
   if (!team) return genericShield;
   const target = `${slugify(team)}.png`;
-  const entry = Object.entries(teamLogoMap).find(([path]) => path.endsWith(`/teams/${target}`));
-  return entry?.[1] ?? genericShield;
+  const hit = Object.entries(teamLogoMap).find(([path]) => path.endsWith(`/teams/${target}`));
+  return hit?.[1] ?? genericShield;
 }
 
-// Reusable components for form
+// Speed presets (ms per simulated minute)
+const SPEED_PRESETS = {
+  "4x": 150,
+  "2x": 300,
+  "1x": 600,
+  "0.5x": 1200,
+};
+
+// Durations available (regulation time)
+const DURATIONS = [60, 90];
+
+// Determine period label (1T, 2T, ET1, ET2, FT)
+function periodLabel(minNow, duration, hasET) {
+  const mid = Math.floor(duration / 2);
+  if (minNow < mid) return "1T";
+  if (minNow < duration) return "2T";
+  if (!hasET) return "FT";
+  if (minNow < duration + 15) return "ET1";
+  if (minNow < duration + 30) return "ET2";
+  return "FT";
+}
+
+// Count goals in events list
+function tallyScore(events, homeName, awayName) {
+  let h = 0, a = 0;
+  for (const ev of events) {
+    const t = (ev.text || "").toLowerCase();
+    if (!t.includes("gol")) continue;
+    if (t.includes((homeName || "").toLowerCase()) || t.includes("local")) h++;
+    else if (t.includes((awayName || "").toLowerCase()) || t.includes("visita") || t.includes("visitante")) a++;
+  }
+  return [h, a];
+}
+
+// Simulate a phase of a match and offset event minutes
+function simulatePhase(baseForm, minutes, offset) {
+  const sim = simulateMatch({ ...baseForm, minutes });
+  const events = sim.events.map(e => ({ ...e, minute: e.minute + offset }));
+  return { events, goalsHome: sim.goalsHome, goalsAway: sim.goalsAway };
+}
+
+// Simulate penalty shootout; returns events and winner
+function simulatePenalties(home, away, startMinute) {
+  const pHome = 0.75, pAway = 0.75;
+  let h = 0, a = 0;
+  const evs = [];
+  const take = (team, p) => (Math.random() < p ? "convierte" : "falla");
+  for (let i = 1; i <= 5; i++) {
+    const resH = take(home, pHome);
+    evs.push({ minute: startMinute, text: `Penal ${i} ${home}: ${resH}` });
+    if (resH === "convierte") h++;
+    const resA = take(away, pAway);
+    evs.push({ minute: startMinute, text: `Penal ${i} ${away}: ${resA}` });
+    if (resA === "convierte") a++;
+  }
+  let i = 6;
+  while (h === a) {
+    const resH = take(home, pHome);
+    evs.push({ minute: startMinute, text: `Muerte súbita ${i} ${home}: ${resH}` });
+    if (resH === "convierte") h++;
+    const resA = take(away, pAway);
+    evs.push({ minute: startMinute, text: `Muerte súbita ${i} ${away}: ${resA}` });
+    if (resA === "convierte") a++;
+    i++;
+    if (i > 20) break;
+  }
+  const winner = h > a ? "home" : (a > h ? "away" : "tie");
+  evs.push({ minute: startMinute, text: `Penales: ${home} ${h} - ${a} ${away} → Gana ${winner === "home" ? home : away}` });
+  return { events: evs, winner };
+}
+
 function Field({ label, error, children }) {
   return (
     <div className="flex flex-col gap-1">
       <label className="text-sm font-medium">{label}</label>
       {children}
-      {error && <p className="text-xs text-red-600 mt-0.5">{error}</p>}
+      {error ? <p className="text-xs text-red-600 mt-0.5">{error}</p> : null}
     </div>
   );
 }
@@ -93,7 +161,6 @@ function ClimateSelect({ value, onChange }) {
   );
 }
 
-// Team badge with logo and name
 function TeamBadge({ name }) {
   const src = logoFor(name);
   return (
@@ -109,124 +176,70 @@ function TeamBadge({ name }) {
   );
 }
 
-// Velocidades: 1 minuto simulado = X ms
-const SPEED_PRESETS = {
-  "4x": 150,
-  "2x": 300,
-  "1x": 600,
-  "0.5x": 1200,
-};
-
-// Etiqueta del tiempo (solo 1T/2T por ahora)
-function halfLabel(minNow, total) {
-  const mid = Math.floor(total / 2);
-  return minNow < mid ? "1T" : "2T";
-}
-
-// Detecta si un evento es gol y para qué lado (heurística)
-function goalSide(ev, homeName, awayName) {
-  const t = (ev.text || "").toLowerCase();
-  const isGoal = t.includes("gol");
-  if (!isGoal) return null;
-  if (t.includes((homeName || "").toLowerCase()) || t.includes("local")) return "home";
-  if (t.includes((awayName || "").toLowerCase()) || t.includes("visita") || t.includes("visitante")) return "away";
-  return null;
-}
-
-
-// Main Simulador component with stats, logos and live events
 export default function Simulador() {
-  // Form state includes team selections and auto-filled stats
   const [form, setForm] = useState({
     home: "",
     away: "",
-    minutes: 90,
+    duration: 90,
+    extraTime: false,
+    penalties: false,
     climate: "normal",
-    homeAttack: 1.0,
+    homeAttack: 1.1,
     homeDefense: 1.0,
     awayAttack: 1.0,
-    awayDefense: 1.0,
+    awayDefense: 1.05,
   });
-
-  const [speedKey, setSpeedKey] = useState("2x"); // 4x / 2x / 1x / 0.5x
-
   const [errors, setErrors] = useState({});
+  const [speedKey, setSpeedKey] = useState("2x");
   const [result, setResult] = useState(null);
   const [liveEvents, setLiveEvents] = useState([]);
   const [clock, setClock] = useState(0);
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [totalMinutes, setTotalMinutes] = useState(form.duration);
+
   const timerRef = useRef(null);
   const nextEventIndexRef = useRef(0);
 
-  const MS_PER_MIN = SPEED_PRESETS[speedKey] ?? 600;
+  // Update team stats when selection changes
+  useEffect(() => {
+    if (form.home && TEAM_STATS[form.home]) {
+      setForm((prev) => ({
+        ...prev,
+        homeAttack: TEAM_STATS[form.home].attack,
+        homeDefense: TEAM_STATS[form.home].defense,
+      }));
+    }
+  }, [form.home]);
 
+  useEffect(() => {
+    if (form.away && TEAM_STATS[form.away]) {
+      setForm((prev) => ({
+        ...prev,
+        awayAttack: TEAM_STATS[form.away].attack,
+        awayDefense: TEAM_STATS[form.away].defense,
+      }));
+    }
+  }, [form.away]);
 
-  // Read stored form on mount; persist on change
+  // Persist form state
   useEffect(() => {
     const raw = localStorage.getItem("sim-react-form");
-    if (raw) {
-      try {
-        const saved = JSON.parse(raw);
-        setForm((f) => ({ ...f, ...saved }));
-      } catch { /* ignore */ }
-    }
+    if (raw) setForm((prev) => ({ ...prev, ...JSON.parse(raw) }));
   }, []);
   useEffect(() => {
     localStorage.setItem("sim-react-form", JSON.stringify(form));
   }, [form]);
 
-  // Update attack/defense when home or away changes
-  useEffect(() => {
-    if (form.home && TEAM_STATS[form.home]) {
-      const { attack, defense } = TEAM_STATS[form.home];
-      setForm((prev) => ({
-        ...prev,
-        homeAttack: attack,
-        homeDefense: defense,
-      }));
-    } else {
-      setForm((prev) => ({
-        ...prev,
-        homeAttack: 1.0,
-        homeDefense: 1.0,
-      }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.home]);
-  useEffect(() => {
-    if (form.away && TEAM_STATS[form.away]) {
-      const { attack, defense } = TEAM_STATS[form.away];
-      setForm((prev) => ({
-        ...prev,
-        awayAttack: attack,
-        awayDefense: defense,
-      }));
-    } else {
-      setForm((prev) => ({
-        ...prev,
-        awayAttack: 1.0,
-        awayDefense: 1.0,
-      }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.away]);
-
   const climateLabel = useMemo(() => {
-    const c = CLIMAS.find((c) => c.id === form.climate);
-    return c ? c.label : "Normal";
+    return CLIMAS.find((c) => c.id === form.climate)?.label ?? "Normal";
   }, [form.climate]);
 
   function validate() {
     const e = {};
     if (!form.home) e.home = "Debe seleccionar un equipo local.";
     if (!form.away) e.away = "Debe seleccionar un equipo visitante.";
-    if (form.home && form.away && form.home === form.away) {
-      e.away = "Los equipos deben ser distintos.";
-    }
-    if (!Number.isFinite(form.minutes) || form.minutes < 30 || form.minutes > 120) {
-      e.minutes = "Minutos entre 30 y 120.";
-    }
+    if (form.home && form.away && form.home === form.away) e.away = "Los equipos deben ser distintos.";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -244,12 +257,35 @@ export default function Simulador() {
 
   function startMatch() {
     if (!validate()) return;
-    const sim = simulateMatch(form);
-    setResult(sim);
+    const base = { ...form };
+    const T = form.duration;
+    const sim1 = simulatePhase(base, T, 0);
+    let eventsAll = [...sim1.events];
+    let [h, a] = tallyScore(eventsAll, form.home, form.away);
+    let finalMinutes = T;
+    if (h === a && form.extraTime) {
+      const simET = simulatePhase(base, 30, T);
+      eventsAll = eventsAll.concat(simET.events);
+      [h, a] = tallyScore(eventsAll, form.home, form.away);
+      finalMinutes = T + 30;
+    }
+    if (h === a && form.penalties) {
+      const pens = simulatePenalties(form.home, form.away, finalMinutes);
+      eventsAll = eventsAll.concat(pens.events);
+    }
+    const payload = {
+      events: eventsAll,
+      lambdaHome: 0,
+      lambdaAway: 0,
+      climate: base.climate,
+      minutes: finalMinutes,
+    };
+    setResult(payload);
     setLiveEvents([]);
     setClock(0);
     setFinished(false);
     nextEventIndexRef.current = 0;
+    setTotalMinutes(finalMinutes);
     setRunning(true);
   }
 
@@ -258,28 +294,27 @@ export default function Simulador() {
   }
 
   function resumeClock() {
-    if (result && !finished) {
-      setRunning(true);
-    }
+    if (result && !finished) setRunning(true);
   }
 
   function resetAll() {
     setRunning(false);
-    clearInterval(timerRef.current);
     setResult(null);
     setLiveEvents([]);
     setClock(0);
     setFinished(false);
+    setTotalMinutes(form.duration);
   }
 
   useEffect(() => {
-    if (!running) { clearInterval(timerRef.current); return; }
+    if (!running) {
+      clearInterval(timerRef.current);
+      return;
+    }
     timerRef.current = setInterval(() => {
       setClock((m) => {
-        const total = clamp(form.minutes, 30, 120);
+        const total = clamp(totalMinutes, 30, 120);
         const next = m + 1;
-
-        // agregar eventos cuyo minuto <= next
         if (result) {
           const evs = result.events;
           let idx = nextEventIndexRef.current;
@@ -293,159 +328,141 @@ export default function Simulador() {
             nextEventIndexRef.current = idx;
           }
         }
-
-        // fin del partido
         if (next >= total) {
           clearInterval(timerRef.current);
           setRunning(false);
           setFinished(true);
-          // (guardarResultado) si quieres aquí
+          if (result) {
+            const [hLive, aLive] = tallyScore(result.events, form.home, form.away);
+            guardarResultado({
+              marcador: `${form.home} ${hLive} - ${aLive} ${form.away}`,
+              events: result.events,
+              climate: result.climate,
+              minutes: total,
+            });
+          }
         }
         return next;
       });
-    }, MS_PER_MIN);
-
+    }, SPEED_PRESETS[speedKey] ?? 600);
     return () => clearInterval(timerRef.current);
-    // 👇 importante: vuelve a crear el intervalo si cambia la velocidad
-  }, [running, result, form.minutes, MS_PER_MIN]);
-
+  }, [running, result, totalMinutes, speedKey]);
 
   return (
     <div className="grid md:grid-cols-3 gap-4">
-      {/* configuration panel */}
       <div className="md:col-span-1 p-4 rounded-2xl bg-white shadow">
         <h2 className="font-semibold mb-4 text-lg">Configuración del partido</h2>
         <div className="flex flex-col gap-3">
           <Field label="Equipo local" error={errors.home}>
-            <Select
-              value={form.home}
-              onChange={(v) => setForm({ ...form, home: v })}
-              options={TEAMS}
-              placeholder="— Selecciona un equipo —"
-            />
+            <Select value={form.home} onChange={(v) => setForm({ ...form, home: v })} options={TEAMS} placeholder="— Selecciona un equipo —" />
           </Field>
           <Field label="Equipo visitante" error={errors.away}>
-            <Select
-              value={form.away}
-              onChange={(v) => setForm({ ...form, away: v })}
-              options={TEAMS}
-              placeholder="— Selecciona un equipo —"
-            />
+            <Select value={form.away} onChange={(v) => setForm({ ...form, away: v })} options={TEAMS} placeholder="— Selecciona un equipo —" />
           </Field>
-          <Field label={`Minutos (${form.minutes})`} error={errors.minutes}>
-            <input
-              type="range"
-              min={30}
-              max={120}
-              step={5}
-              value={form.minutes}
-              onChange={(e) => setForm({ ...form, minutes: Number(e.target.value) })}
-              className="w-full"
-            />
+          <Field label="Duración">
+            <select
+              value={form.duration}
+              onChange={(e) => setForm({ ...form, duration: Number(e.target.value) })}
+              className="border rounded-xl px-3 py-2 focus:outline-none focus:ring w-full"
+            >
+              {DURATIONS.map((d) => <option key={d} value={d}>{d} minutos</option>)}
+            </select>
           </Field>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.extraTime}
+                onChange={(e) => setForm({ ...form, extraTime: e.target.checked })}
+              />
+              Alargue (si empatan)
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.penalties}
+                onChange={(e) => setForm({ ...form, penalties: e.target.checked })}
+                disabled={!form.extraTime}
+              />
+              Penales si persiste el empate
+            </label>
+          </div>
           <Field label="Clima">
             <ClimateSelect value={form.climate} onChange={(v) => setForm({ ...form, climate: v })} />
           </Field>
-
           <Field label="Velocidad">
             <select
               value={speedKey}
               onChange={(e) => setSpeedKey(e.target.value)}
               className="border rounded-xl px-3 py-2 focus:outline-none focus:ring w-full"
             >
-              {Object.keys(SPEED_PRESETS).map((k) => (
-                <option key={k} value={k}>{k}</option>
-              ))}
+              {Object.keys(SPEED_PRESETS).map((k) => <option key={k} value={k}>{k}</option>)}
             </select>
           </Field>
-
-
-          {/* Stats display read-only */}
-          <div className="grid grid-cols-2 gap-2 text-sm mt-4">
-            <div className="border rounded-xl p-2">
-              <h4 className="font-medium">{form.home || "Local"}</h4>
-              <p>Ataque: {form.homeAttack.toFixed(2)}</p>
-              <p>Defensa: {form.homeDefense.toFixed(2)}</p>
+          {(form.home || form.away) && (
+            <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
+              <div className="border rounded-xl p-2">
+                <div className="font-medium mb-1">{form.home || "Local"}</div>
+                <div>Ataque: {form.homeAttack.toFixed(2)}</div>
+                <div>Defensa: {form.homeDefense.toFixed(2)}</div>
+              </div>
+              <div className="border rounded-xl p-2">
+                <div className="font-medium mb-1">{form.away || "Visita"}</div>
+                <div>Ataque: {form.awayAttack.toFixed(2)}</div>
+                <div>Defensa: {form.awayDefense.toFixed(2)}</div>
+              </div>
             </div>
-            <div className="border rounded-xl p-2">
-              <h4 className="font-medium">{form.away || "Visita"}</h4>
-              <p>Ataque: {form.awayAttack.toFixed(2)}</p>
-              <p>Defensa: {form.awayDefense.toFixed(2)}</p>
-            </div>
-          </div>
-          {/* Buttons */}
-          <div className="flex gap-2 mt-4">
+          )}
+          <div className="flex gap-2 mt-4 flex-wrap">
             {!result || finished ? (
-              <button
-                onClick={startMatch}
-                className="px-4 py-2 rounded-2xl bg-black text-white"
-              >
-                Simular (en vivo)
-              </button>
+              <button onClick={startMatch} className="px-4 py-2 rounded-2xl bg-black text-white">Simular (en vivo)</button>
             ) : running ? (
-              <button onClick={stopClock} className="px-4 py-2 rounded-2xl border">
-                Pausar
-              </button>
+              <button onClick={stopClock} className="px-4 py-2 rounded-2xl border">Pausar</button>
             ) : (
-              <button
-                onClick={resumeClock}
-                className="px-4 py-2 rounded-2xl bg-black text-white"
-              >
-                Reanudar
-              </button>
-
-
+              <button onClick={resumeClock} className="px-4 py-2 rounded-2xl bg-black text-white">Reanudar</button>
             )}
-            <button onClick={resetAll} className="px-4 py-2 rounded-2xl border">
-              Limpiar
-            </button>
-            
-            <button
-              onClick={() => {
-                if (!result) return;
-                setRunning(false);
-                setLiveEvents(result.events);   // muestra todo
-                setClock(clamp(form.minutes, 30, 120));
-                setFinished(true);
-              }}
-              className="px-4 py-2 rounded-2xl border"
-            >
-              Adelantar
-            </button>
-            
-
-
+            {result && (
+              <button
+                onClick={() => {
+                  setRunning(false);
+                  setLiveEvents(result.events);
+                  setClock(totalMinutes);
+                  setFinished(true);
+                }}
+                className="px-4 py-2 rounded-2xl border"
+              >
+                Adelantar
+              </button>
+            )}
+            <button onClick={resetAll} className="px-4 py-2 rounded-2xl border">Limpiar</button>
           </div>
         </div>
       </div>
-
-      {/* result panel */}
       <div className="md:col-span-2 p-4 rounded-2xl bg-white shadow">
         <h2 className="font-semibold mb-4 text-lg">Resultado</h2>
-        {/* Header with team badges and clock */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
             <TeamBadge name={form.home} />
             <div className="text-center">
               <p className="text-sm uppercase tracking-wide text-gray-500">
-                {form.home || "Local"} vs {form.away || "Visita"}
+                {(form.home || "Local").toUpperCase()} vs {(form.away || "Visita").toUpperCase()}
               </p>
               {(() => {
                 let h = 0, a = 0;
                 for (const ev of liveEvents) {
-                  const side = goalSide(ev, form.home, form.away);
-                  if (side === "home") h++;
-                  if (side === "away") a++;
+                  const t = (ev.text || "").toLowerCase();
+                  if (!t.includes("gol")) continue;
+                  if (t.includes((form.home || "").toLowerCase()) || t.includes("local")) h++;
+                  else if (t.includes((form.away || "").toLowerCase()) || t.includes("visita") || t.includes("visitante")) a++;
                 }
                 return <p className="text-2xl font-bold">{result ? `${h} - ${a}` : "— : —"}</p>;
               })()}
-
             </div>
             <TeamBadge name={form.away} />
           </div>
           <div className="text-right">
             <div className="font-mono text-xl tabular-nums">
-              Min {clock}' — {halfLabel(clock, form.minutes)}
+              Min {clock}' — {periodLabel(clock, form.duration, form.extraTime)}
             </div>
             {result && (
               <div className="text-xs text-gray-600">
@@ -455,7 +472,6 @@ export default function Simulador() {
               </div>
             )}
           </div>
-
         </div>
         {!result ? (
           <p className="text-sm text-gray-600">
@@ -471,17 +487,13 @@ export default function Simulador() {
                 <ol className="space-y-1 text-sm">
                   {liveEvents.map((ev, i) => (
                     <li key={i} className="flex items-center gap-2">
-                      <span className="inline-block w-10 text-right tabular-nums">
-                        {ev.minute}'
-                      </span>
+                      <span className="inline-block w-12 text-right tabular-nums">{ev.minute}'</span>
                       <span>{ev.text}</span>
                     </li>
                   ))}
                 </ol>
               )}
-              {finished && (
-                <p className="mt-3 text-sm text-gray-500">Partido finalizado.</p>
-              )}
+              {finished && <p className="mt-3 text-sm text-gray-500">Partido finalizado.</p>}
             </div>
           </div>
         )}
