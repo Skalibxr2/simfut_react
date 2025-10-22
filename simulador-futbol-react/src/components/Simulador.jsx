@@ -485,13 +485,10 @@ function ClimateSelect({ value, onChange, disabled }) {
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-<<<<<<< Updated upstream
-=======
 
       className="border rounded-xl px-3 py-2 focus:outline-none focus:ring w-full"
->>>>>>> Stashed changes
       disabled={disabled}
-      className="border rounded-xl px-3 py-2 focus:outline-none focus:ring w-full"
+      
     >
       {CLIMAS.map((c) => (
         <option key={c.id} value={c.id}>
@@ -709,15 +706,6 @@ export default function Simulador() {
   }, [form.climate]);
 
 
-  // Nombres a mostrar (si hay snapshot, usamos los del inicio del partido)
-<<<<<<< Updated upstream
-  //const homeName = configSnap?.homeName || form.home;
-  //const awayName = configSnap?.awayName || form.away;
-=======
-  const homeName = configSnap?.homeName || form.home;
-  const awayName = configSnap?.awayName || form.away;
->>>>>>> Stashed changes
-
   function validate() {
     const e = {};
     if (!form.home) e.home = "Debe seleccionar un equipo local.";
@@ -795,19 +783,6 @@ export default function Simulador() {
       eventsAll = eventsAll.concat(pens.events);
     }
 
-<<<<<<< Updated upstream
-    // add disciplinary events (cards)
-    eventsAll = addDisciplinaryEvents({
-      events: eventsAll,
-      homeName: form.home,
-      awayName: form.away,
-      totalMinutes: finalMinutes,
-      basePer90: 4.8,
-      redRatio: 0.14,
-      etMultiplier: 0.4,
-      intensity: 1,
-    });
-=======
     eventsAll = addFixedMilestones({
     events: eventsAll,
     duration: T,
@@ -827,7 +802,6 @@ export default function Simulador() {
     etMultiplier: 0.4,
     intensity: 1,
   });
->>>>>>> Stashed changes
 
     const payload = {
       events: eventsAll,
