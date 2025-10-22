@@ -4,7 +4,7 @@ import genericShield from "../assets/teams/_generic.png";
 
 // Attack and defense ratings for teams
 const TEAM_STATS = {
-  "Colo-Colo": { attack: 1.2, defense: 1.1 },
+  "Colo-Colo": { attack: 2.2, defense: 1.1 },
   "Universidad de Chile": { attack: 1.1, defense: 1.05 },
   "Universidad Católica": { attack: 1.15, defense: 1.1 },
   "Cobresal": { attack: 1.0, defense: 1.0 },
@@ -109,6 +109,31 @@ function TeamBadge({ name }) {
   );
 }
 
+// Velocidades: 1 minuto simulado = X ms
+const SPEED_PRESETS = {
+  "4x": 150,
+  "2x": 300,
+  "1x": 600,
+  "0.5x": 1200,
+};
+
+// Etiqueta del tiempo (solo 1T/2T por ahora)
+function halfLabel(minNow, total) {
+  const mid = Math.floor(total / 2);
+  return minNow < mid ? "1T" : "2T";
+}
+
+// Detecta si un evento es gol y para qué lado (heurística)
+function goalSide(ev, homeName, awayName) {
+  const t = (ev.text || "").toLowerCase();
+  const isGoal = t.includes("gol");
+  if (!isGoal) return null;
+  if (t.includes((homeName || "").toLowerCase()) || t.includes("local")) return "home";
+  if (t.includes((awayName || "").toLowerCase()) || t.includes("visita") || t.includes("visitante")) return "away";
+  return null;
+}
+
+
 // Main Simulador component with stats, logos and live events
 export default function Simulador() {
   // Form state includes team selections and auto-filled stats
@@ -123,6 +148,8 @@ export default function Simulador() {
     awayDefense: 1.0,
   });
 
+  const [speedKey, setSpeedKey] = useState("2x"); // 4x / 2x / 1x / 0.5x
+
   const [errors, setErrors] = useState({});
   const [result, setResult] = useState(null);
   const [liveEvents, setLiveEvents] = useState([]);
@@ -132,7 +159,8 @@ export default function Simulador() {
   const timerRef = useRef(null);
   const nextEventIndexRef = useRef(0);
 
-  const MS_PER_MIN = 600;
+  const MS_PER_MIN = SPEED_PRESETS[speedKey] ?? 600;
+
 
   // Read stored form on mount; persist on change
   useEffect(() => {
@@ -245,20 +273,19 @@ export default function Simulador() {
   }
 
   useEffect(() => {
-    if (!running) {
-      clearInterval(timerRef.current);
-      return;
-    }
+    if (!running) { clearInterval(timerRef.current); return; }
     timerRef.current = setInterval(() => {
-      setClock((current) => {
+      setClock((m) => {
         const total = clamp(form.minutes, 30, 120);
-        const nextMinute = current + 1;
+        const next = m + 1;
+
+        // agregar eventos cuyo minuto <= next
         if (result) {
-          const events = result.events;
+          const evs = result.events;
           let idx = nextEventIndexRef.current;
           const toAdd = [];
-          while (idx < events.length && events[idx].minute <= nextMinute) {
-            toAdd.push(events[idx]);
+          while (idx < evs.length && evs[idx].minute <= next) {
+            toAdd.push(evs[idx]);
             idx++;
           }
           if (toAdd.length) {
@@ -266,27 +293,22 @@ export default function Simulador() {
             nextEventIndexRef.current = idx;
           }
         }
-        if (nextMinute >= total) {
+
+        // fin del partido
+        if (next >= total) {
           clearInterval(timerRef.current);
           setRunning(false);
           setFinished(true);
-          if (result) {
-            guardarResultado({
-              marcador: `${form.home} ${result.goalsHome} - ${result.goalsAway} ${form.away}`,
-              events: result.events,
-              lambdaHome: result.lambdaHome,
-              lambdaAway: result.lambdaAway,
-              climate: result.climate,
-              minutes: result.minutes,
-            });
-          }
+          // (guardarResultado) si quieres aquí
         }
-        return nextMinute;
+        return next;
       });
     }, MS_PER_MIN);
+
     return () => clearInterval(timerRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running, result, form.minutes]);
+    // 👇 importante: vuelve a crear el intervalo si cambia la velocidad
+  }, [running, result, form.minutes, MS_PER_MIN]);
+
 
   return (
     <div className="grid md:grid-cols-3 gap-4">
@@ -324,6 +346,20 @@ export default function Simulador() {
           <Field label="Clima">
             <ClimateSelect value={form.climate} onChange={(v) => setForm({ ...form, climate: v })} />
           </Field>
+
+          <Field label="Velocidad">
+            <select
+              value={speedKey}
+              onChange={(e) => setSpeedKey(e.target.value)}
+              className="border rounded-xl px-3 py-2 focus:outline-none focus:ring w-full"
+            >
+              {Object.keys(SPEED_PRESETS).map((k) => (
+                <option key={k} value={k}>{k}</option>
+              ))}
+            </select>
+          </Field>
+
+
           {/* Stats display read-only */}
           <div className="grid grid-cols-2 gap-2 text-sm mt-4">
             <div className="border rounded-xl p-2">
@@ -357,10 +393,28 @@ export default function Simulador() {
               >
                 Reanudar
               </button>
+
+
             )}
             <button onClick={resetAll} className="px-4 py-2 rounded-2xl border">
               Limpiar
             </button>
+            
+            <button
+              onClick={() => {
+                if (!result) return;
+                setRunning(false);
+                setLiveEvents(result.events);   // muestra todo
+                setClock(clamp(form.minutes, 30, 120));
+                setFinished(true);
+              }}
+              className="px-4 py-2 rounded-2xl border"
+            >
+              Adelantar
+            </button>
+            
+
+
           </div>
         </div>
       </div>
@@ -376,14 +430,23 @@ export default function Simulador() {
               <p className="text-sm uppercase tracking-wide text-gray-500">
                 {form.home || "Local"} vs {form.away || "Visita"}
               </p>
-              <p className="text-2xl font-bold">
-                {result ? `${result.goalsHome} - ${result.goalsAway}` : "— : —"}
-              </p>
+              {(() => {
+                let h = 0, a = 0;
+                for (const ev of liveEvents) {
+                  const side = goalSide(ev, form.home, form.away);
+                  if (side === "home") h++;
+                  if (side === "away") a++;
+                }
+                return <p className="text-2xl font-bold">{result ? `${h} - ${a}` : "— : —"}</p>;
+              })()}
+
             </div>
             <TeamBadge name={form.away} />
           </div>
           <div className="text-right">
-            <div className="font-mono text-xl tabular-nums">{clock}'</div>
+            <div className="font-mono text-xl tabular-nums">
+              Min {clock}' — {halfLabel(clock, form.minutes)}
+            </div>
             {result && (
               <div className="text-xs text-gray-600">
                 <p>λ L: {result.lambdaHome}</p>
@@ -392,6 +455,7 @@ export default function Simulador() {
               </div>
             )}
           </div>
+
         </div>
         {!result ? (
           <p className="text-sm text-gray-600">
@@ -410,7 +474,7 @@ export default function Simulador() {
                       <span className="inline-block w-10 text-right tabular-nums">
                         {ev.minute}'
                       </span>
-                        <span>{ev.text}</span>
+                      <span>{ev.text}</span>
                     </li>
                   ))}
                 </ol>
