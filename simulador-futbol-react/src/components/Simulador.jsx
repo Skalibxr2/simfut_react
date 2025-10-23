@@ -31,10 +31,16 @@ const TEAMS = [
 ];
 
 // Import all team logos from assets
-const teamLogoMap =
-  (typeof import.meta === "object" && typeof import.meta.glob === "function")
-    ? import.meta.glob("../assets/teams/*.png", { eager: true, as: "url" })
-    : {};
+// Evita warnings en iife: no referenciar "import.meta" de forma estática
+let teamLogoMap = {};
+ try {
+   const im = (0, eval)('import.meta'); // <- es string, esbuild no lo analiza
+   if (im && typeof im.glob === 'function') {
+     teamLogoMap = im.glob('../assets/teams/*.png', { eager: true, as: 'url' });
+   }
+ } catch {
+   // En tests/karmas (iife) caerá aquí y quedará {} sin warnings
+ }
 
 
 // Slugify function to map team names to file names
