@@ -151,33 +151,25 @@ function detectType(t) {
 // iconos simples;
 function iconFor(type) {
   switch (type) {
-    case "goal":
-    case "goal": return "⚽";
+    case "goal": 
       return "⚽";
-    case "yellow":
-    case "yellow": return "🟨";
+    case "yellow":   
       return "🟨";
     case "red":
-      return "🟥";
-    case "red": return "🟥";
-    case "injury":
-    case "injury": return "🏥";
+      return "🟥";   
+    case "injury":    
       return "🏥";
     case "pen":
-      return "🧤";
-    case "pen": return "🧤";
-    case "start":
-    case "start": return "🟢";
+      return "🧤";    
+    case "start":    
       return "🟢";
-    case "break":
-    case "break": return "⏸️";
+      
+      case "break":    
       return "⏸️";
-    case "secondStart":
-    case "secondStart": return "▶️";
+    case "secondStart":    
       return "▶️";
     case "end":
-      return "🏁";
-    case "end": return "🏁";
+      return "🏁";    
     default:
       return "•";
   }
