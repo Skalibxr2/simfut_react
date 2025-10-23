@@ -30,39 +30,34 @@ const TEAMS = [
   "Palestino",
 ];
 
-// Import all team logos from assets
-// Evita warnings en iife: no referenciar "import.meta" de forma estática
-let teamLogoMap = {};
- try {
-   const im = (0, eval)('import.meta'); // <- es string, esbuild no lo analiza
-   if (im && typeof im.glob === 'function') {
-     teamLogoMap = im.glob('../assets/teams/*.png', { eager: true, as: 'url' });
-   }
- } catch {
-   // En tests/karmas (iife) caerá aquí y quedará {} sin warnings
- }
+// --- Logos ---------------------------------------------------------------
+// 1) Cargar todos los logos como URL con Vite
+const modules = import.meta.glob('../assets/teams/*.png', { eager: true, query: '?url', import: 'default' });
 
+// 2) Reindexar por basename en minúsculas
+const teamLogoMap = Object.fromEntries(
+  Object.entries(modules).map(([path, url]) => {
+    const base = path.split('/').pop().replace(/\.png$/i, '').toLowerCase();
+    return [base, url];
+  })
+);
 
-// Slugify function to map team names to file names
+// 3) Slug tolerante
 function slugify(name) {
-  return name
+  return String(name)
+    .normalize('NFD').replace(/\p{Diacritic}/gu, '')
     .toLowerCase()
-    .normalize("NFD").replace(/\p{Diacritic}/gu, "")
-    .replace(/\u00f1/g, "n")
-    .replace(/['’]/g, "")
-    .replace(/&/g, "y")
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "");
+    .replace(/ñ/g, 'n').replace(/['’]/g, '').replace(/&/g, 'y')
+    .replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
-function logoFor(team) {
-  if (!team) return genericShield;
-  const target = `${slugify(team)}.png`;
-  const hit = Object.entries(teamLogoMap).find(([path]) =>
-    path.endsWith(`/teams/${target}`),
-  );
-  return hit?.[1] ?? genericShield;
+export function logoFor(teamName) {
+  const s = slugify(teamName || '');
+  const k1 = s;
+  const k2 = s.replace(/-/g, '');
+  return teamLogoMap[k1] || teamLogoMap[k2] || genericShield;
 }
+
 
 // --- Eventos fijos del partido (neutrales, centrados) ---
 function addFixedMilestones({ events, duration, extraTime, penalties, finalMinutes }) {
