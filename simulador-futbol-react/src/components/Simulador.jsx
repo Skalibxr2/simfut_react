@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { CLIMAS, simulateMatch, clamp } from "../lib/engine.js";
+import { CLIMAS, simulateMatch, clamp } from "../lib/Engine.js";
 import genericShield from "../assets/teams/_generic.png";
 
 // Attack and defense ratings for teams
@@ -31,7 +31,11 @@ const TEAMS = [
 ];
 
 // Import all team logos from assets
-const teamLogoMap = import.meta.glob("../assets/teams/*.png", { eager: true, as: "url" });
+const teamLogoMap =
+  (typeof import.meta === "object" && typeof import.meta.glob === "function")
+    ? import.meta.glob("../assets/teams/*.png", { eager: true, as: "url" })
+    : {};
+
 
 // Slugify function to map team names to file names
 function slugify(name) {
@@ -512,7 +516,7 @@ function TeamBadge({ name }) {
 // Alto fijo para alinear filas aunque un lado esté vacío
 const ROW_HEIGHT = 50; // px, ajusta si quieres más compacto
 
-function EventTimeline({ events, homeName, awayName, autoScroll = true }) {
+export function EventTimeline({ events, homeName, awayName, autoScroll = true }) {
   // Convertimos a filas en el orden exacto recibido
   const rows = useMemo(() => {
     return events.map((ev) => {
