@@ -3,6 +3,7 @@
 // karma.conf.js
 export default function (config) {
   config.set({
+    
     frameworks: ['jasmine'],
     files: [{ pattern: 'src/**/*.spec.{js,jsx}', watched: false }],
     preprocessors: { 'src/**/*.spec.{js,jsx}': ['esbuild'] },
@@ -21,7 +22,8 @@ export default function (config) {
       // ¡NO pongas format: 'esm' por ahora! (ver punto 2)
     },
     browsers: ['ChromeHeadless'],
-    reporters: ['progress'],
+    reporters: ['progress', 'coverage'],
+    coverageReporter: { type: 'html', dir: 'coverage/' },
     singleRun: true,
   });
 }

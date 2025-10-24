@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { CLIMAS, simulateMatch, clamp } from "../lib/Engine.js";
 import genericShield from "../assets/teams/_generic.png";
+import { periodLabel } from '../lib/matchUtils.js'; 
 
 // Attack and defense ratings for teams
 const TEAM_STATS = {
@@ -351,15 +352,6 @@ function addDisciplinaryEvents({
 }
 // Helper functions for phases and penalties
 // Determine period label (1T, 2T, ET1, ET2, FT)
-function periodLabel(minNow, duration, hasET) {
-  const mid = Math.floor(duration / 2);
-  if (minNow < mid) return "1T";
-  if (minNow < duration) return "2T";
-  if (!hasET) return "FT";
-  if (minNow < duration + 15) return "ET1";
-  if (minNow < duration + 30) return "ET2";
-  return "FT";
-}
 
 // Count goals in events list
 
