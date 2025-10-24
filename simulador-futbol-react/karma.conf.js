@@ -19,7 +19,7 @@ export default function (config) {
       },
       // opcional pero recomendable en Windows:
       resolveExtensions: ['.js', '.jsx', '.json']
-      // ¡NO pongas format: 'esm' por ahora! (ver punto 2)
+      
     },
     browsers: ['ChromeHeadless'],
     reporters: ['progress', 'coverage'],
