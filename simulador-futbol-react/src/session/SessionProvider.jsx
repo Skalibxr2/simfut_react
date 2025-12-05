@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { apiFetch } from '../lib/apiClient.js'
+import { httpRequest, setAuthToken } from '../api/httpClient.js'
 import { clearSession, loadSession, persistSession } from './sessionStorage.js'
 
 const SessionContext = createContext(null)
@@ -13,12 +13,14 @@ export function SessionProvider({ children }) {
     if (saved?.token && saved?.user) {
       setToken(saved.token)
       setUser(saved.user)
+      setAuthToken(saved.token)
     }
   }, [])
 
   const setSession = useCallback((nextToken, nextUser) => {
     setToken(nextToken)
     setUser(nextUser)
+    setAuthToken(nextToken)
     if (nextToken && nextUser) {
       persistSession({ token: nextToken, user: nextUser })
     } else {
@@ -27,9 +29,9 @@ export function SessionProvider({ children }) {
   }, [])
 
   const login = useCallback(async (credentials) => {
-    const data = await apiFetch('/api/auth/login', {
+    const data = await httpRequest('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify(credentials)
+      body: credentials
     })
     const nextUser = { username: data.username, role: data.role }
     setSession(data.token, nextUser)
@@ -37,9 +39,9 @@ export function SessionProvider({ children }) {
   }, [setSession])
 
   const register = useCallback(async (payload) => {
-    const data = await apiFetch('/api/auth/register', {
+    const data = await httpRequest('/api/auth/register', {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: payload
     })
     const nextUser = { username: data.username, role: data.role }
     setSession(data.token, nextUser)
@@ -50,7 +52,7 @@ export function SessionProvider({ children }) {
     setSession(null, null)
   }, [setSession])
 
-  const authFetch = useCallback((path, options = {}) => apiFetch(path, options, token), [token])
+  const authFetch = useCallback((path, options = {}) => httpRequest(path, options), [])
 
   const value = useMemo(() => ({
     token,

@@ -37,6 +37,9 @@ export default function Header() {
                     <li><NavLink to="/" className={linkClass}>Inicio</NavLink></li>
                     <li><NavLink to="/simular" className={linkClass}>Simular</NavLink></li>
                     <li><NavLink to="/stats" className={linkClass}>Resultados</NavLink></li>
+                    {user?.role === 'ADMIN' && (
+                        <li><NavLink to="/catalogos" className={linkClass}>Catálogos</NavLink></li>
+                    )}
                     {!isAuthenticated && (
                         <li><NavLink to="/login" className={linkClass}>Entrar</NavLink></li>
                     )}
@@ -55,6 +58,9 @@ export default function Header() {
                     <li><NavLink onClick={() => setOpen(false)} to="/" className={linkClass}>Inicio</NavLink></li>
                     <li><NavLink onClick={() => setOpen(false)} to="/simular" className={linkClass}>Simular</NavLink></li>
                     <li><NavLink onClick={() => setOpen(false)} to="/stats" className={linkClass}>Resultados</NavLink></li>
+                    {user?.role === 'ADMIN' && (
+                        <li><NavLink onClick={() => setOpen(false)} to="/catalogos" className={linkClass}>Catálogos</NavLink></li>
+                    )}
                     {!isAuthenticated && (
                         <li><NavLink onClick={() => setOpen(false)} to="/login" className={linkClass}>Entrar</NavLink></li>
                     )}
