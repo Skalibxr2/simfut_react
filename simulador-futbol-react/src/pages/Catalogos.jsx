@@ -30,7 +30,7 @@ export default function Catalogos() {
   const jugadoresResource = useAsyncResource(() => fetchJugadores())
 
   const [equipoForm, setEquipoForm] = useState({ nombre: '', ciudad: '' })
-  const [jugadorForm, setJugadorForm] = useState({ nombre: '', posicion: 'DEL', equipoId: '' })
+  const [jugadorForm, setJugadorForm] = useState({ nombre: '', posicion: 'DEL', numeroCamiseta: '', equipoId: '' })
   const [editingEquipoId, setEditingEquipoId] = useState(null)
   const [editingJugadorId, setEditingJugadorId] = useState(null)
   const [savingEquipo, setSavingEquipo] = useState(false)
@@ -54,7 +54,7 @@ export default function Catalogos() {
   }
 
   const resetJugadorForm = () => {
-    setJugadorForm({ nombre: '', posicion: 'DEL', equipoId: '' })
+    setJugadorForm({ nombre: '', posicion: 'DEL', numeroCamiseta: '', equipoId: '' })
     setEditingJugadorId(null)
   }
 
@@ -91,7 +91,11 @@ export default function Catalogos() {
     setSavingJugador(true)
     setJugadorError('')
     try {
-      const payload = { ...jugadorForm, equipoId: jugadorForm.equipoId || null }
+      const payload = {
+        ...jugadorForm,
+        numeroCamiseta: jugadorForm.numeroCamiseta ? Number(jugadorForm.numeroCamiseta) : null,
+        equipoId: jugadorForm.equipoId || null,
+      }
       if (editingJugadorId) {
         const updated = await updateJugador(editingJugadorId, payload)
         jugadoresResource.setItems((prev) => prev.map((j) => j.id === editingJugadorId ? updated : j))
@@ -262,6 +266,19 @@ export default function Catalogos() {
               </select>
             </div>
             <div>
+              <label className="block text-sm text-gray-700">Número de camiseta</label>
+              <input
+                className="mt-1 w-full border rounded-lg px-3 py-2"
+                type="number"
+                min="1"
+                max="99"
+                value={jugadorForm.numeroCamiseta}
+                onChange={(e) => setJugadorForm({ ...jugadorForm, numeroCamiseta: e.target.value })}
+                disabled={!canManageCatalogos}
+                required
+              />
+            </div>
+            <div>
               <label className="block text-sm text-gray-700">Equipo</label>
               <select
                 className="mt-1 w-full border rounded-lg px-3 py-2"
@@ -300,7 +317,7 @@ export default function Catalogos() {
                 <div key={jug.id} className="border rounded-lg px-3 py-2 flex items-center justify-between">
                   <div>
                     <p className="font-semibold">{jug.nombre}</p>
-                    <p className="text-sm text-gray-600">{jug.posicion} {teamLabel ? `• ${teamLabel}` : ''}</p>
+                    <p className="text-sm text-gray-600">#{jug.numeroCamiseta} · {jug.posicion} {teamLabel ? `• ${teamLabel}` : ''}</p>
                   </div>
                   <div className="flex gap-2 text-sm">
                     <button
@@ -308,7 +325,12 @@ export default function Catalogos() {
                       disabled={!canManageCatalogos}
                       onClick={() => {
                         setEditingJugadorId(jug.id)
-                        setJugadorForm({ nombre: jug.nombre || '', posicion: jug.posicion || 'DEL', equipoId: jug.equipoId || '' })
+                        setJugadorForm({
+                          nombre: jug.nombre || '',
+                          posicion: jug.posicion || 'DEL',
+                          numeroCamiseta: jug.numeroCamiseta || '',
+                          equipoId: jug.equipoId || '',
+                        })
                       }}
                     >
                       Editar
