@@ -1,6 +1,7 @@
 package com.simfut.backend.controller;
 
-import com.simfut.backend.model.Jugador;
+import com.simfut.backend.controller.dto.JugadorRequest;
+import com.simfut.backend.controller.dto.JugadorResponse;
 import com.simfut.backend.service.JugadorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -33,13 +34,13 @@ public class JugadorController {
 
     @GetMapping
     @Operation(summary = "Listar jugadores")
-    public List<Jugador> findAll() {
+    public List<JugadorResponse> findAll() {
         return jugadorService.findAll();
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Obtener jugador por id")
-    public Jugador findById(@PathVariable Long id) {
+    public JugadorResponse findById(@PathVariable Long id) {
         return jugadorService.findById(id);
     }
 
@@ -47,15 +48,15 @@ public class JugadorController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Crear jugador")
     @PreAuthorize("hasRole('ADMIN')")
-    public Jugador create(@Valid @RequestBody Jugador jugador) {
-        return jugadorService.create(jugador);
+    public JugadorResponse create(@Valid @RequestBody JugadorRequest request) {
+        return jugadorService.create(request);
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Actualizar jugador")
     @PreAuthorize("hasRole('ADMIN')")
-    public Jugador update(@PathVariable Long id, @Valid @RequestBody Jugador jugador) {
-        return jugadorService.update(id, jugador);
+    public JugadorResponse update(@PathVariable Long id, @Valid @RequestBody JugadorRequest request) {
+        return jugadorService.update(id, request);
     }
 
     @DeleteMapping("/{id}")

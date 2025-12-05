@@ -1,6 +1,8 @@
 package com.simfut.backend.service;
 
 import com.simfut.backend.auth.Role;
+import com.simfut.backend.controller.dto.JugadorRequest;
+import com.simfut.backend.controller.dto.JugadorResponse;
 import com.simfut.backend.model.Equipo;
 import com.simfut.backend.model.Jugador;
 import com.simfut.backend.repository.EquipoRepository;
@@ -22,44 +24,68 @@ public class JugadorService {
         this.authorizationService = authorizationService;
     }
 
-    public List<Jugador> findAll() {
+    public List<JugadorResponse> findAll() {
         authorizationService.requireAnyRole(Role.USER, Role.ADMIN);
-        return jugadorRepository.findAll();
+        return jugadorRepository.findAll()
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
-    public Jugador findById(Long id) {
+    public JugadorResponse findById(Long id) {
         authorizationService.requireAnyRole(Role.USER, Role.ADMIN);
-        return jugadorRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado"));
+        Jugador jugador = findEntityById(id);
+        return toResponse(jugador);
     }
 
-    public Jugador create(Jugador jugador) {
+    public JugadorResponse create(JugadorRequest request) {
         authorizationService.requireAnyRole(Role.ADMIN);
-        jugador.setEquipo(resolveEquipo(jugador.getEquipo()));
-        return jugadorRepository.save(jugador);
+        Jugador jugador = new Jugador();
+        applyRequest(jugador, request);
+        return toResponse(jugadorRepository.save(jugador));
     }
 
-    public Jugador update(Long id, Jugador jugador) {
+    public JugadorResponse update(Long id, JugadorRequest request) {
         authorizationService.requireAnyRole(Role.ADMIN);
-        Jugador existing = findById(id);
-        existing.setNombre(jugador.getNombre());
-        existing.setPosicion(jugador.getPosicion());
-        existing.setNumeroCamiseta(jugador.getNumeroCamiseta());
-        existing.setEquipo(resolveEquipo(jugador.getEquipo()));
-        return jugadorRepository.save(existing);
+        Jugador existing = findEntityById(id);
+        applyRequest(existing, request);
+        return toResponse(jugadorRepository.save(existing));
     }
 
     public void delete(Long id) {
         authorizationService.requireAnyRole(Role.ADMIN);
-        Jugador existing = findById(id);
+        Jugador existing = findEntityById(id);
         jugadorRepository.delete(existing);
     }
 
-    private Equipo resolveEquipo(Equipo equipo) {
-        if (equipo == null || equipo.getId() == null) {
+    private void applyRequest(Jugador jugador, JugadorRequest request) {
+        jugador.setNombre(request.getNombre());
+        jugador.setPosicion(request.getPosicion());
+        jugador.setNumeroCamiseta(request.getNumeroCamiseta());
+        jugador.setEquipo(resolveEquipo(request.getEquipoId()));
+    }
+
+    private Jugador findEntityById(Long id) {
+        return jugadorRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado"));
+    }
+
+    private Equipo resolveEquipo(Long equipoId) {
+        if (equipoId == null) {
             return null;
         }
-        return equipoRepository.findById(equipo.getId())
+        return equipoRepository.findById(equipoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Equipo asociado no encontrado"));
+    }
+
+    private JugadorResponse toResponse(Jugador jugador) {
+        Long equipoId = jugador.getEquipo() != null ? jugador.getEquipo().getId() : null;
+        return new JugadorResponse(
+                jugador.getId(),
+                jugador.getNombre(),
+                jugador.getPosicion(),
+                jugador.getNumeroCamiseta(),
+                equipoId
+        );
     }
 }

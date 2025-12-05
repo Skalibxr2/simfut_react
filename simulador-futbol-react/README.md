@@ -38,3 +38,14 @@ npm run dev
 ```
 
 Configura `VITE_API_URL` en un archivo `.env` para apuntar al backend adecuado.
+
+## Pasos de prueba manuales (CRUD de jugadores)
+1. Inicia el backend (`./mvnw spring-boot:run` dentro de `backend`) y el frontend (`npm run dev`).
+2. Inicia sesión con un usuario `ADMIN` para poder gestionar catálogos.
+3. En la pantalla **Catálogos**:
+   - Crea un equipo con nombre y (opcional) ciudad.
+   - Crea un jugador ingresando nombre, posición, número de camiseta y el equipo creado (o déjalo sin asignar).
+   - Verifica que el jugador aparezca en la lista con su número, posición y equipo.
+4. Edita el jugador cambiando cualquier campo y guarda; confirma que la lista refleja los cambios.
+5. Elimina el jugador y verifica que desaparece de la lista.
+6. Repite con más de un jugador para validar la actualización de listas y los mensajes de error en caso de falta de permisos.
