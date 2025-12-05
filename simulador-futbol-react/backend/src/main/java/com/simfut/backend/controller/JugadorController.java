@@ -22,6 +22,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/jugadores")
 @Tag(name = "Jugadores", description = "Gestión de jugadores")
+@PreAuthorize("hasAnyRole('USER','ADMIN')")
 public class JugadorController {
 
     private final JugadorService jugadorService;

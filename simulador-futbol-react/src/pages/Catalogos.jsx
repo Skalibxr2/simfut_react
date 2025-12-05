@@ -25,6 +25,7 @@ function useAsyncResource(loader) {
 
 export default function Catalogos() {
   const { user } = useSession()
+  const canManageCatalogos = user?.role === 'ADMIN'
   const equiposResource = useAsyncResource(() => fetchEquipos())
   const jugadoresResource = useAsyncResource(() => fetchJugadores())
 
@@ -59,6 +60,10 @@ export default function Catalogos() {
 
   const handleEquipoSubmit = async (event) => {
     event.preventDefault()
+    if (!canManageCatalogos) {
+      setEquipoError('No tienes permisos para gestionar equipos')
+      return
+    }
     setSavingEquipo(true)
     setEquipoError('')
     try {
@@ -79,6 +84,10 @@ export default function Catalogos() {
 
   const handleJugadorSubmit = async (event) => {
     event.preventDefault()
+    if (!canManageCatalogos) {
+      setJugadorError('No tienes permisos para gestionar jugadores')
+      return
+    }
     setSavingJugador(true)
     setJugadorError('')
     try {
@@ -99,6 +108,10 @@ export default function Catalogos() {
   }
 
   const removeEquipo = async (id) => {
+    if (!canManageCatalogos) {
+      setEquipoError('No tienes permisos para gestionar equipos')
+      return
+    }
     setEquipoError('')
     try {
       await deleteEquipo(id)
@@ -109,6 +122,10 @@ export default function Catalogos() {
   }
 
   const removeJugador = async (id) => {
+    if (!canManageCatalogos) {
+      setJugadorError('No tienes permisos para gestionar jugadores')
+      return
+    }
     setJugadorError('')
     try {
       await deleteJugador(id)
@@ -124,6 +141,11 @@ export default function Catalogos() {
         <p className="text-sm text-gray-500">Autenticado como {user?.username} ({user?.role})</p>
         <h1 className="text-3xl font-bold">Catálogos del simulador</h1>
         <p className="text-gray-600">Gestiona equipos y jugadores consumiendo el backend con estados de carga y errores.</p>
+        {!canManageCatalogos && (
+          <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            Solo los administradores pueden modificar estos catálogos. Tu sesión actual no tiene permisos de edición.
+          </p>
+        )}
       </header>
 
       <div className="grid md:grid-cols-2 gap-6">
@@ -143,6 +165,7 @@ export default function Catalogos() {
                 className="mt-1 w-full border rounded-lg px-3 py-2"
                 value={equipoForm.nombre}
                 onChange={(e) => setEquipoForm({ ...equipoForm, nombre: e.target.value })}
+                disabled={!canManageCatalogos}
                 required
               />
             </div>
@@ -152,14 +175,15 @@ export default function Catalogos() {
                 className="mt-1 w-full border rounded-lg px-3 py-2"
                 value={equipoForm.ciudad}
                 onChange={(e) => setEquipoForm({ ...equipoForm, ciudad: e.target.value })}
+                disabled={!canManageCatalogos}
               />
             </div>
             {equipoError && <p className="text-sm text-red-600">{equipoError}</p>}
             <div className="flex gap-2">
               <button
                 type="submit"
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg disabled:opacity-60"
-                disabled={savingEquipo}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg disabled:opacity-60 disabled:cursor-not-allowed"
+                disabled={!canManageCatalogos || savingEquipo}
               >
                 {savingEquipo ? 'Guardando...' : editingEquipoId ? 'Actualizar equipo' : 'Crear equipo'}
               </button>
@@ -181,13 +205,15 @@ export default function Catalogos() {
                 </div>
                 <div className="flex gap-2 text-sm">
                   <button
-                    className="px-2 py-1 rounded bg-gray-100"
+                    className="px-2 py-1 rounded bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                    disabled={!canManageCatalogos}
                     onClick={() => { setEditingEquipoId(eq.id); setEquipoForm({ nombre: eq.nombre || '', ciudad: eq.ciudad || '' }) }}
                   >
                     Editar
                   </button>
                   <button
-                    className="px-2 py-1 rounded bg-red-50 text-red-600"
+                    className="px-2 py-1 rounded bg-red-50 text-red-600 disabled:opacity-60 disabled:cursor-not-allowed"
+                    disabled={!canManageCatalogos}
                     onClick={() => removeEquipo(eq.id)}
                   >
                     Eliminar
@@ -217,6 +243,7 @@ export default function Catalogos() {
                 className="mt-1 w-full border rounded-lg px-3 py-2"
                 value={jugadorForm.nombre}
                 onChange={(e) => setJugadorForm({ ...jugadorForm, nombre: e.target.value })}
+                disabled={!canManageCatalogos}
                 required
               />
             </div>
@@ -226,6 +253,7 @@ export default function Catalogos() {
                 className="mt-1 w-full border rounded-lg px-3 py-2"
                 value={jugadorForm.posicion}
                 onChange={(e) => setJugadorForm({ ...jugadorForm, posicion: e.target.value })}
+                disabled={!canManageCatalogos}
               >
                 <option value="DEL">DEL</option>
                 <option value="MED">MED</option>
@@ -239,6 +267,7 @@ export default function Catalogos() {
                 className="mt-1 w-full border rounded-lg px-3 py-2"
                 value={jugadorForm.equipoId}
                 onChange={(e) => setJugadorForm({ ...jugadorForm, equipoId: e.target.value })}
+                disabled={!canManageCatalogos}
               >
                 <option value="">Sin equipo asignado</option>
                 {equipoOptions.map((opt) => (
@@ -250,8 +279,8 @@ export default function Catalogos() {
             <div className="flex gap-2">
               <button
                 type="submit"
-                className="bg-green-600 text-white px-4 py-2 rounded-lg disabled:opacity-60"
-                disabled={savingJugador}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg disabled:opacity-60 disabled:cursor-not-allowed"
+                disabled={!canManageCatalogos || savingJugador}
               >
                 {savingJugador ? 'Guardando...' : editingJugadorId ? 'Actualizar jugador' : 'Crear jugador'}
               </button>
@@ -275,7 +304,8 @@ export default function Catalogos() {
                   </div>
                   <div className="flex gap-2 text-sm">
                     <button
-                      className="px-2 py-1 rounded bg-gray-100"
+                      className="px-2 py-1 rounded bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                      disabled={!canManageCatalogos}
                       onClick={() => {
                         setEditingJugadorId(jug.id)
                         setJugadorForm({ nombre: jug.nombre || '', posicion: jug.posicion || 'DEL', equipoId: jug.equipoId || '' })
@@ -284,7 +314,8 @@ export default function Catalogos() {
                       Editar
                     </button>
                     <button
-                      className="px-2 py-1 rounded bg-red-50 text-red-600"
+                      className="px-2 py-1 rounded bg-red-50 text-red-600 disabled:opacity-60 disabled:cursor-not-allowed"
+                      disabled={!canManageCatalogos}
                       onClick={() => removeJugador(jug.id)}
                     >
                       Eliminar
