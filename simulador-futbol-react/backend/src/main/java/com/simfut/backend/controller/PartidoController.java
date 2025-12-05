@@ -22,6 +22,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/partidos")
 @Tag(name = "Partidos", description = "Gestión de partidos")
+@PreAuthorize("hasAnyRole('USER','ADMIN')")
 public class PartidoController {
 
     private final PartidoService partidoService;
