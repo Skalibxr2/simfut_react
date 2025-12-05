@@ -5,6 +5,9 @@ import Footer from './components/Footer.jsx'
 import Home from './pages/Home.jsx'
 import Simular from './pages/Simular.jsx'
 import Stats from './pages/Stats.jsx'
+import Login from './pages/Login.jsx'
+import Register from './pages/Register.jsx'
+import ProtectedRoute from './session/ProtectedRoute.jsx'
 
 export default function App() {
   return (
@@ -13,8 +16,10 @@ export default function App() {
       <main className="flex-1 container mx-auto p-4">
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/simular" element={<Simular />} />
-          <Route path="/stats" element={<Stats />} />
+          <Route path="/simular" element={<ProtectedRoute><Simular /></ProtectedRoute>} />
+          <Route path="/stats" element={<ProtectedRoute roles={['ADMIN']}><Stats /></ProtectedRoute>} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
         </Routes>
       </main>
       <Footer />

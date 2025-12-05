@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -44,12 +45,14 @@ public class EquipoController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Crear equipo")
+    @PreAuthorize("hasRole('ADMIN')")
     public Equipo create(@Valid @RequestBody Equipo equipo) {
         return equipoService.create(equipo);
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Actualizar equipo")
+    @PreAuthorize("hasRole('ADMIN')")
     public Equipo update(@PathVariable Long id, @Valid @RequestBody Equipo equipo) {
         return equipoService.update(id, equipo);
     }
@@ -57,6 +60,7 @@ public class EquipoController {
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Eliminar equipo")
+    @PreAuthorize("hasRole('ADMIN')")
     public void delete(@PathVariable Long id) {
         equipoService.delete(id);
     }

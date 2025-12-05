@@ -1,8 +1,10 @@
 import { Link, NavLink } from 'react-router-dom'
 import { useState } from 'react'
+import { useSession } from '../session/SessionProvider.jsx'
 
 export default function Header() {
     const [open, setOpen] = useState(false)
+    const { isAuthenticated, user, logout } = useSession()
 
     const linkBase =
         "px-2 py-1 rounded-md transition focus:outline-none focus:ring-2 focus:ring-white/40"
@@ -35,6 +37,15 @@ export default function Header() {
                     <li><NavLink to="/" className={linkClass}>Inicio</NavLink></li>
                     <li><NavLink to="/simular" className={linkClass}>Simular</NavLink></li>
                     <li><NavLink to="/stats" className={linkClass}>Resultados</NavLink></li>
+                    {!isAuthenticated && (
+                        <li><NavLink to="/login" className={linkClass}>Entrar</NavLink></li>
+                    )}
+                    {isAuthenticated && (
+                        <li className="flex items-center gap-2 text-white/80">
+                            <span className="text-sm">{user?.username} ({user?.role})</span>
+                            <button onClick={logout} className="text-sm px-2 py-1 bg-white/10 rounded hover:bg-white/20">Salir</button>
+                        </li>
+                    )}
                 </ul>
             </nav>
 
@@ -44,6 +55,15 @@ export default function Header() {
                     <li><NavLink onClick={() => setOpen(false)} to="/" className={linkClass}>Inicio</NavLink></li>
                     <li><NavLink onClick={() => setOpen(false)} to="/simular" className={linkClass}>Simular</NavLink></li>
                     <li><NavLink onClick={() => setOpen(false)} to="/stats" className={linkClass}>Resultados</NavLink></li>
+                    {!isAuthenticated && (
+                        <li><NavLink onClick={() => setOpen(false)} to="/login" className={linkClass}>Entrar</NavLink></li>
+                    )}
+                    {isAuthenticated && (
+                        <li className="flex items-center gap-2 text-white/80">
+                            <span className="text-sm">{user?.username} ({user?.role})</span>
+                            <button onClick={() => { logout(); setOpen(false) }} className="text-sm px-2 py-1 bg-white/10 rounded hover:bg-white/20">Salir</button>
+                        </li>
+                    )}
                 </ul>
             </div>
         </header>
