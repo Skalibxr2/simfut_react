@@ -8,6 +8,7 @@ import Stats from './pages/Stats.jsx'
 import Login from './pages/Login.jsx'
 import Register from './pages/Register.jsx'
 import ProtectedRoute from './session/ProtectedRoute.jsx'
+import Catalogos from './pages/Catalogos.jsx'
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/simular" element={<ProtectedRoute><Simular /></ProtectedRoute>} />
           <Route path="/stats" element={<ProtectedRoute roles={['ADMIN']}><Stats /></ProtectedRoute>} />
+          <Route path="/catalogos" element={<ProtectedRoute roles={['ADMIN']}><Catalogos /></ProtectedRoute>} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
         </Routes>
