@@ -21,3 +21,8 @@ server:
 logging:
   level:
     org.hibernate.SQL: DEBUG
+
+security:
+  jwt:
+    secret: c3VwZXItc2VjcmV0LWp3dC1zaW1mdXQtYmFja2VuZC0xMjM0NTY=
+    expiration: 3600000
